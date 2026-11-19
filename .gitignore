@@ -1,0 +1,9 @@
+build/
+build-*/
+out/
+dist/
+.vs/
+.vscode/
+*.user
+*.zip
+*.old.exe
