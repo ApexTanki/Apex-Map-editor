@@ -1,5 +1,7 @@
 # Apex Editor
 
+> A remake of the Alternativa3D map editor written in C++ with an OpenGL renderer.
+
 A native **OpenGL 3.3 Core** rewrite of the Tanki Online map editor
 ([alternativa-editor-mod](https://github.com/tubixpvp/alternativa-editor-mod), ActionScript 3 / Adobe AIR).
 It assembles maps from prop libraries (tiles, sprites, spawn points, flags, bonus regions,
