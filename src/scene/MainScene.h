@@ -113,6 +113,11 @@ class MainScene {
     Vec2 getPropsGroupCenter(const PropSet& set) const;
     void rotatePropsCounterClockwise(const PropSet& set);
     void rotatePropsClockwise(const PropSet& set);
+    // Properties-panel edits for a whole selection: no snapping, the arrangement of the group is kept.
+    void translateProps(const PropSet& set, const Vec3& delta);
+    // Turns the set rigidly by `angle` radians around `pivot` (positions orbit it, every prop turns and its
+    // footprint follows).
+    void rotatePropsAround(const PropSet& set, const Vec2& pivot, double angle);
 
     // ---- layers ----
     Layers layers;

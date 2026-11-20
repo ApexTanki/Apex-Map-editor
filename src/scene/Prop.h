@@ -132,6 +132,8 @@ class Prop : public std::enable_shared_from_this<Prop> {
     // Prop.rotateClockwise/CounterClockwise (used by spawn ±5°).
     void rotateClockwise();
     void rotateCounterClockwise();
+    // Turns the stored footprint (distancesX/Y) by `quarterTurnsCcw` * 90 degrees around the prop position.
+    void rotateFootprint(int quarterTurnsCcw);
 
     // Bonus region / kill box extents
     double minX() const { return x; }

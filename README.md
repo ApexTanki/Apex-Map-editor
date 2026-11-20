@@ -32,6 +32,7 @@ and a GPU with OpenGL 3.3. No extra runtime is required.
 - Property panels: textures, bonus regions, kill boxes, control points, plus prop parameters
 - Map import and export in XML **1.0** and **1.0.Light**, including collision primitives
 - English / Russian UI (`assets/localization.json`)
+- Light / dark theme (Options > Dark mode), remembered between runs
 
 Not yet ported: import of XML 2.0/3.0 maps (they fall back to the 1.0 importer with a warning),
 XML 3.0 and HTML5 binary export, and batch processing. See `docs/SPEC.md` for the full
