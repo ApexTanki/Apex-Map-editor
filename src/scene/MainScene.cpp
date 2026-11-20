@@ -300,12 +300,30 @@ void MainScene::moveSelectedPropsByMouse(bool vertical, double mx, double my) {
         main.y = pt.y;
     }
     main.setPosition(main.x, main.y, main.z);
-    for (auto& p : selectedProps) {
+    for (auto& p : selectedProps)
         if (p.get() != &main) p->setPosition(p->x + dx, p->y + dy, p->z + dz);
-        if (snapMode || p->kind == PropKind::Mesh) {
-            p->snapToGrid();
-            occupyMap.occupy(*p);
-        }
+
+    // Snap the selection as one body. Snapping every prop on its own pulls props that sit at custom
+    // (off-grid) positions or heights onto different grid lines and the group falls apart. The anchor (the
+    // main prop, or else the first prop that snaps) goes to the grid and the rest follow by the same shift.
+    // For props that already sit on the grid this gives the same result as snapping each one.
+    auto snaps = [&](const Prop& p) { return snapMode || p.kind == PropKind::Mesh; };
+    Prop* anchor = snaps(main) ? &main : nullptr;
+    if (!anchor)
+        for (auto& p : selectedProps)
+            if (snaps(*p)) {
+                anchor = p.get();
+                break;
+            }
+    Vec3 shift{0, 0, 0};
+    if (anchor) {
+        const Vec3 before = anchor->position();
+        anchor->snapToGrid();
+        shift = anchor->position() - before;
+    }
+    for (auto& p : selectedProps) {
+        if (p.get() != anchor) p->setPosition(p->x + shift.x, p->y + shift.y, p->z + shift.z);
+        if (snaps(*p)) occupyMap.occupy(*p);
     }
 }
 
@@ -516,17 +534,44 @@ void MainScene::rotatePropsCounterClockwise(const PropSet& set) { rotateProps(se
 void MainScene::rotatePropsClockwise(const PropSet& set) { rotateProps(set, grid::snapByHalf ? -PI / 4 : -PI / 2); }
 
 void MainScene::rotateProps(const PropSet& set, double angle) {
+    rotatePropsAround(set, getPropsGroupCenter(set), angle);
+}
+
+void MainScene::translateProps(const PropSet& set, const Vec3& delta) {
+    for (auto& p : set) p->setPosition(p->x + delta.x, p->y + delta.y, p->z + delta.z);
+    changed = true;
+}
+
+void MainScene::rotatePropsAround(const PropSet& set, const Vec2& pivot, double angle) {
     double c = std::cos(angle), s = std::sin(angle);
-    Vec2 o = getPropsGroupCenter(set);
+    // A quarter turn maps the footprint exactly. Any other angle (45 degrees in half-cell mode) has no
+    // exact grid footprint, so it is recomputed from the rotated mesh instead.
+    const double turns = angle / (PI / 2);
+    const bool quarter = std::abs(turns - std::round(turns)) < 1e-9;
+    const int quarterTurnsCcw = (int)std::lround(turns);
+    if (quarter) {
+        // cos/sin of a quarter turn must be exactly 0 or +-1. cos(PI/2) is 6e-17, and that noise is enough for
+        // snapToGrid (ceilTo) to push a prop sitting on a grid line one whole cell further.
+        static const double kCos[4] = {1, 0, -1, 0}, kSin[4] = {0, 1, 0, -1};
+        const int k = ((quarterTurnsCcw % 4) + 4) % 4;
+        c = kCos[k];
+        s = kSin[k];
+    }
     for (auto& p : set) {
-        double dx = p->x - o.x, dy = p->y - o.y;
-        p->setPosition(dx * c - dy * s + o.x, dx * s + dy * c + o.y, p->z);
-        // The original applies this (asymmetric) formula to the footprint; kept as-is.
-        p->distancesX.x = p->distancesX.x * c - p->distancesX.y * s;
-        p->distancesX.y = p->distancesX.y * s + p->distancesX.y * c;
-        p->distancesY.x = p->distancesY.x * c - p->distancesY.y * s;
-        p->distancesY.y = p->distancesY.y * s + p->distancesY.y * c;
+        double dx = p->x - pivot.x, dy = p->y - pivot.y;
+        p->setPosition(dx * c - dy * s + pivot.x, dx * s + dy * c + pivot.y, p->z);
         p->setRotationZ(p->rotationZ + angle);
+        // The footprint feeds the occupancy map and the pivot of the next group rotation, so it has to
+        // follow the prop; otherwise props drift apart and stop fitting each other.
+        if (quarter) {
+            p->rotateFootprint(quarterTurnsCcw);
+        } else {
+            // calculate() only ever sets `multi` (footprint wider than one cell), so a diagonal turn would
+            // switch the prop to the corner lattice for good. `multi` describes the prop itself, not its pose.
+            const bool multi = p->multi;
+            p->calculate(true);
+            p->multi = multi;
+        }
     }
 }
 

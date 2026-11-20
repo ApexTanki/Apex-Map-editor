@@ -45,6 +45,7 @@
         "MENUITEM_OPTIONS_PROPSINTERSECT_ALLDENIED": "Запретить любые пересечения",
         "MENUITEM_OPTIONS_SNAP": "Выравнивать пропы по сетке",
         "MENUITEM_OPTIONS_LANGUAGES": "Язык",
+        "MENUITEM_OPTIONS_DARKMODE": "Тёмная тема",
 
         "MENUITEM_HELP":"Помощь",
         "MENUITEM_HELP_SHOW": "Показать сводку",
@@ -191,6 +192,7 @@
         "MENUITEM_OPTIONS_PROPSINTERSECT_ALLDENIED": "All intersections denied",
         "MENUITEM_OPTIONS_SNAP": "Snap props to grid",
         "MENUITEM_OPTIONS_LANGUAGES": "Language",
+        "MENUITEM_OPTIONS_DARKMODE": "Dark mode",
 
         "MENUITEM_HELP":"Help",
         "MENUITEM_HELP_SHOW": "Show help",

@@ -304,6 +304,16 @@ void Prop::setRotationZ(double value) {
     changed();
 }
 
+void Prop::rotateFootprint(int quarterTurnsCcw) {
+    for (int i = ((quarterTurnsCcw % 4) + 4) % 4; i > 0; --i) {
+        // One counter-clockwise quarter turn maps (x, y) to (-y, x): the new X range is the old Y range
+        // mirrored, and the new Y range is the old X range.
+        Vec2 t = distancesY;
+        distancesY = distancesX;
+        distancesX = {-t.y, -t.x};
+    }
+}
+
 void Prop::rotateCounterClockwise() {
     if (kind == PropKind::Spawn) {
         setRotationZ(rotationZ + DEG5);

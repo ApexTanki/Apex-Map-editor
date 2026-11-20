@@ -29,6 +29,7 @@ class Settings {
     void load();
     void save() const;
     std::string language;
+    bool darkMode = false;
     std::vector<std::string> recentDirs;  // max 3, most recent first
     void appendRecentDirectory(const std::string& path);
     void clearRecent();

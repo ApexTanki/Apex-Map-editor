@@ -357,7 +357,7 @@ void Renderer::renderScene(MainScene& scene, Framebuffer& fb, const RenderOption
                      {p->distancesX.y + p->x, p->distancesY.y + p->y, z},
                      {p->distancesX.x + p->x, p->distancesY.y + p->y, z},
                      {p->distancesX.x + p->x, p->distancesY.x + p->y, z}};
-        drawGridQuad(c, 5, 2.0f / 128.0f * 5.0f, 0x0000FF, 1.0f);
+        drawGridQuad(c, 5, 2.0f / 128.0f * 5.0f, opt.boundColor, 1.0f);
     }
     // Grid (WireMaterial(10, 7500, 7500, 15, 0x909090)), centred at (250, 250).
     if (opt.grid) {
@@ -367,7 +367,7 @@ void Renderer::renderScene(MainScene& scene, Framebuffer& fb, const RenderOption
         const double half = 7500 / 2.0;
         Vec3 c[4] = {{250 - half, 250 - half, 0}, {250 + half, 250 - half, 0}, {250 + half, 250 + half, 0},
                      {250 - half, 250 + half, 0}};
-        drawGridQuad(c, 15, 5.0f / 500.0f, 0x909090, 1.0f);
+        drawGridQuad(c, 15, 5.0f / 500.0f, opt.gridColor, 1.0f);
         glDisable(GL_POLYGON_OFFSET_FILL);
     }
     // Transparent pass, back to front.

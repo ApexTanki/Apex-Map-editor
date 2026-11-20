@@ -85,6 +85,7 @@ void Settings::load() {
     nlohmann::json j = nlohmann::json::parse(text, nullptr, false);
     if (j.is_discarded()) return;
     if (j.contains("lang") && j["lang"].is_string()) language = j["lang"].get<std::string>();
+    if (j.contains("darkMode") && j["darkMode"].is_boolean()) darkMode = j["darkMode"].get<bool>();
     if (j.contains("recentDirs") && j["recentDirs"].is_object() && j["recentDirs"].contains("list")) {
         for (auto& d : j["recentDirs"]["list"])
             if (d.is_string()) recentDirs.push_back(d.get<std::string>());
@@ -94,6 +95,7 @@ void Settings::load() {
 void Settings::save() const {
     nlohmann::json j;
     j["lang"] = language;
+    j["darkMode"] = darkMode;
     j["recentDirs"]["list"] = recentDirs;
     writeFileText(path(), j.dump(2));
 }

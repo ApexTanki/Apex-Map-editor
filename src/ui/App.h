@@ -62,6 +62,8 @@ class App {
     void cmdClearLibraries();
     void setSnapping(bool on);
     void setGeometryView(bool collision);
+    void requestDarkMode(bool on);  // saved at once, applied at the start of the next frame
+    void applyThemeNow();
     void askToDiscardChanges(std::function<void()> then);
     void onLibrariesLoaded();
     void selectLibrary(const std::string& name);
@@ -120,6 +122,7 @@ class App {
     bool showProperties_ = false;
     bool showLayers_ = false;
     bool showHelp_ = false;
+    bool themeDirty_ = false;
     std::string helpText_;
     std::map<std::string, bool> layerVisible_;
 

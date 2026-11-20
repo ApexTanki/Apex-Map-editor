@@ -13,6 +13,7 @@
 
 #include "core/Util.h"
 #include "ui/App.h"
+#include "ui/Theme.h"
 
 #if defined(_WIN32)
 #include <windows.h>
@@ -35,28 +36,6 @@ static std::string executableDir() {
 #else
     return ".";
 #endif
-}
-
-static void applyStyle() {
-    // Light theme loosely matching the Flex "halo" look of the original.
-    ImGui::StyleColorsLight();
-    ImGuiStyle& s = ImGui::GetStyle();
-    s.WindowRounding = 3;
-    s.FrameRounding = 3;
-    s.GrabRounding = 3;
-    s.WindowBorderSize = 1;
-    s.FrameBorderSize = 1;
-    ImVec4* c = s.Colors;
-    c[ImGuiCol_WindowBg] = ImVec4(0.91f, 0.92f, 0.93f, 1.f);
-    c[ImGuiCol_TitleBg] = ImVec4(0.80f, 0.84f, 0.86f, 1.f);
-    c[ImGuiCol_TitleBgActive] = ImVec4(0.80f, 0.84f, 0.86f, 1.f);
-    c[ImGuiCol_MenuBarBg] = ImVec4(0.94f, 0.94f, 0.94f, 1.f);
-    c[ImGuiCol_Button] = ImVec4(0.93f, 0.94f, 0.95f, 1.f);
-    c[ImGuiCol_ButtonHovered] = ImVec4(0.73f, 0.87f, 0.96f, 1.f);
-    c[ImGuiCol_ButtonActive] = ImVec4(0.55f, 0.76f, 0.91f, 1.f);
-    c[ImGuiCol_Header] = ImVec4(0.84f, 0.88f, 0.90f, 1.f);
-    c[ImGuiCol_HeaderHovered] = ImVec4(0.73f, 0.87f, 0.96f, 1.f);
-    c[ImGuiCol_HeaderActive] = ImVec4(0.55f, 0.76f, 0.91f, 1.f);
 }
 
 static void loadFonts() {
@@ -133,8 +112,7 @@ int main(int argc, char** argv) {
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
     io.IniFilename = nullptr;
-    applyStyle();
-    loadFonts();
+    loadFonts();  // the theme is applied by App::init, once the saved settings are known
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 330 core");
 
@@ -169,7 +147,8 @@ int main(int argc, char** argv) {
         glfwGetFramebufferSize(window, &w, &h);
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glViewport(0, 0, w, h);
-        glClearColor(0.85f, 0.87f, 0.88f, 1.f);
+        const ae::Theme& th = ae::currentTheme();
+        glClearColor(th.windowClear[0], th.windowClear[1], th.windowClear[2], 1.f);
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         glfwSwapBuffers(window);

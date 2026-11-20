@@ -15,12 +15,14 @@
 #include "scene/Grid.h"
 #include "ui/Dialogs.h"
 #include "ui/Locale.h"
+#include "ui/Theme.h"
 
 namespace ae {
 
 static const char* L(const std::string& id) { return Locale::get(id).c_str(); }
 static std::string LS(const std::string& id) { return Locale::get(id); }
 static ImTextureID texId(unsigned id) { return (ImTextureID)(intptr_t)id; }
+static ImU32 imColor(uint32_t rgb) { return IM_COL32((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF, 255); }
 
 // ---------------------------------------------------------------------------------------------
 // Init
@@ -30,6 +32,7 @@ bool App::init(GLFWwindow* window, const std::string& assetsDir, const StartupOp
     assetsDir_ = assetsDir;
     opts_ = opts;
     Settings::instance().load();
+    applyTheme(Settings::instance().darkMode);
     if (!Locale::init(assetsDir + "/localization.json", Settings::instance().language, err)) return false;
     if (!TextureRegistry::instance().init(assetsDir, err)) {
         if (err && err->empty()) *err = "missing textures in " + assetsDir;
@@ -62,11 +65,46 @@ void App::shutdown() {
     renderer_.shutdown();
 }
 
+// Dark mode: the "off" toolbar icons are dark line art on a transparent background and would vanish
+// on dark buttons. Invert their grey pixels; coloured pixels stay as they are.
+static TextureRef lightenGreyPixels(const TextureRef& src) {
+    TextureRef t = image::clone(*src);
+    for (size_t i = 0; i + 3 < t->pixels.size(); i += 4) {
+        uint8_t* p = &t->pixels[i];
+        int hi = std::max({p[0], p[1], p[2]}), lo = std::min({p[0], p[1], p[2]});
+        if (hi - lo > 40) continue;
+        p[0] = (uint8_t)(255 - p[0]);
+        p[1] = (uint8_t)(255 - p[1]);
+        p[2] = (uint8_t)(255 - p[2]);
+    }
+    return t;
+}
+
 void App::loadUiIcons(const std::string& dir) {
+    uiIcons_.clear();
+    const bool dark = currentTheme().dark;
     for (const char* n : {"snap_icon", "snap_icon_on", "boxes_icon", "boxes_icon_on", "grid_icon", "grid_icon_on",
                           "textures_icon", "textures_icon_on", "hide_selected", "show_all"}) {
-        if (TextureRef t = image::load(dir + "/" + n + ".png")) uiIcons_[n] = t;
+        TextureRef t = image::load(dir + "/" + n + ".png");
+        if (!t) continue;
+        // The "_on" icons carry their own opaque fill, so they read fine on either theme.
+        const std::string name = n;
+        const bool isOn = name.size() > 3 && name.compare(name.size() - 3, 3, "_on") == 0;
+        uiIcons_[n] = (dark && !isOn) ? lightenGreyPixels(t) : t;
     }
+}
+
+void App::requestDarkMode(bool on) {
+    Settings::instance().darkMode = on;
+    Settings::instance().save();
+    themeDirty_ = true;
+}
+
+void App::applyThemeNow() {
+    themeDirty_ = false;
+    applyTheme(Settings::instance().darkMode);
+    icons_.clear();  // library thumbnails were rendered on the old background; they redraw lazily
+    loadUiIcons(assetsDir_ + "/icons");
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -254,6 +292,8 @@ void App::onPropListSelect(const PropRef& prop) {
 
 void App::frame(double dt) {
     iconsThisFrame_ = 0;
+    // Switch themes before anything is drawn, so no texture freed here is already in this frame's draw lists.
+    if (themeDirty_) applyThemeNow();
     // Background work
     if (libs_.loading() && !wasLoading_) loadStart_ = glfwGetTime();
     wasLoading_ = libs_.loading();
@@ -565,6 +605,8 @@ void App::drawMenuBar() {
                 }
             ImGui::EndMenu();
         }
+        const bool dark = currentTheme().dark;
+        if (item("MENUITEM_OPTIONS_DARKMODE", nullptr, dark)) requestDarkMode(!dark);
         ImGui::EndMenu();
     }
     if (ImGui::BeginMenu(L("MENUITEM_HELP"))) {
@@ -670,9 +712,12 @@ void App::drawWorkspace(float x, float y, float w, float h) {
     RenderOptions ro;
     ro.grid = scene_.gridVisible;
     ro.collisionView = showCollision_;
-    ro.clear[0] = 1.0f;  // white workspace background
-    ro.clear[1] = 1.0f;
-    ro.clear[2] = 1.0f;
+    const Theme& th = currentTheme();
+    ro.clear[0] = th.workspaceClear[0];  // white in the light theme, as in the original
+    ro.clear[1] = th.workspaceClear[1];
+    ro.clear[2] = th.workspaceClear[2];
+    ro.gridColor = th.grid;
+    ro.boundColor = th.planeBound;
     renderer_.renderScene(scene_, sceneFb_, ro);
     ImGui::Image(texId(sceneFb_.colorTexture()), ImVec2((float)vw, (float)vh), ImVec2(0, 1), ImVec2(1, 0));
     bool hovered = ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
@@ -763,7 +808,7 @@ void App::drawOverlays(ImDrawList* dl, float ox, float oy, float w, float h) {
         dl->AddRect(ImVec2(ox + (float)container_->selRectX, oy + (float)container_->selRectY),
                     ImVec2(ox + (float)(container_->selRectX + container_->selRectW),
                            oy + (float)(container_->selRectY + container_->selRectH)),
-                    IM_COL32(0, 0, 0, 255));
+                    imColor(currentTheme().selectionRect));
     }
 
     // Axis indicator (CursorScene.drawAxis), bottom-left corner.
@@ -772,7 +817,7 @@ void App::drawOverlays(ImDrawList* dl, float ox, float oy, float w, float h) {
     ImVec2 o(ox + size, oy + h - size);
     dl->AddLine(o, ImVec2(o.x + (float)cm.a * size, o.y + (float)cm.b * size), IM_COL32(255, 0, 0, 255), 2);
     dl->AddLine(o, ImVec2(o.x + (float)cm.e * size, o.y + (float)cm.f * size), IM_COL32(0, 255, 0, 255), 2);
-    dl->AddLine(o, ImVec2(o.x + (float)cm.i * size, o.y + (float)cm.j * size), IM_COL32(0, 0, 255, 255), 2);
+    dl->AddLine(o, ImVec2(o.x + (float)cm.i * size, o.y + (float)cm.j * size), imColor(currentTheme().axisBlue), 2);
     dl->PopClipRect();
 }
 
@@ -809,7 +854,8 @@ void App::renderPreviewProp(const Prop& prop, Framebuffer& fb, double yaw) {
     tmp->x = tmp->y = tmp->z = 0;
     tmp->selected = false;
     tmp->materialOverride = MaterialOverride::None;
-    float clear[4] = {1.f, 1.f, 1.f, 1.f};
+    const Theme& th = currentTheme();
+    float clear[4] = {th.workspaceClear[0], th.workspaceClear[1], th.workspaceClear[2], 1.f};
     renderer_.renderProp(*tmp, Matrix4::mul(container, camLocal), fb, clear);
 }
 
@@ -842,7 +888,8 @@ void App::drawPreview(float x, float y, float w, float h) {
     if (previewProp_) {
         renderPreviewProp(*previewProp_, previewFb_, previewYaw_);
     } else {
-        float clear[4] = {1.f, 1.f, 1.f, 1.f};
+        const Theme& th = currentTheme();
+        float clear[4] = {th.workspaceClear[0], th.workspaceClear[1], th.workspaceClear[2], 1.f};
         previewFb_.bind();
         glClearColor(clear[0], clear[1], clear[2], clear[3]);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -1203,25 +1250,41 @@ void App::drawPropParamsPanel(float x, float y, float w, float h) {
                 for (auto& p : sel)
                     if (p->hasCollisionParam()) p->collisionEnabled = value;
         }
-        if (sel.size() == 1) {
+        const bool single = sel.size() == 1;
+        if (single) {
             ImGui::Text("%s %s", L("PROPPARAMS_LABEL_NAME"), main->name.c_str());
             ImGui::Text("%s %s", L("PROPPARAMS_LABEL_GROUP"), main->groupName.c_str());
             ImGui::Text("%s %s", L("PROPPARAMS_LABEL_LIBRARY"), main->libraryName.c_str());
             ImGui::Spacing();
-            ImGui::TextUnformatted("Position:");
-            double px = main->x, py = main->y, pz = main->z;
-            ImGui::SetNextItemWidth(-1);
-            bool ch = ImGui::InputDouble("##px", &px, 1, 10, "%.3f");
-            ImGui::SetNextItemWidth(-1);
-            ch |= ImGui::InputDouble("##py", &py, 1, 10, "%.3f");
-            ImGui::SetNextItemWidth(-1);
-            ch |= ImGui::InputDouble("##pz", &pz, 1, 10, "%.3f");
-            if (ch) main->setPosition(px, py, pz);
-            ImGui::TextUnformatted("Rotation:");
-            double deg = std::fmod(toDegree(main->rotationZ), 360.0);
-            ImGui::SetNextItemWidth(-1);
-            if (ImGui::InputDouble("##rz", &deg, 0.1, 1.0, "%.1f"))
-                main->setRotationZ(toRadian(std::clamp(deg, -360.0, 360.0)));
+        }
+        // With several props selected the fields show the main (last selected) prop and edit the whole group
+        // around it: the group moves / turns as one rigid body, so the models keep fitting each other.
+        ImGui::TextUnformatted("Position:");
+        double px = main->x, py = main->y, pz = main->z;
+        ImGui::SetNextItemWidth(-1);
+        bool ch = ImGui::InputDouble("##px", &px, 1, 10, "%.3f");
+        ImGui::SetNextItemWidth(-1);
+        ch |= ImGui::InputDouble("##py", &py, 1, 10, "%.3f");
+        ImGui::SetNextItemWidth(-1);
+        ch |= ImGui::InputDouble("##pz", &pz, 1, 10, "%.3f");
+        if (ch) {
+            if (single)
+                main->setPosition(px, py, pz);
+            else
+                scene_.translateProps(sel, {px - main->x, py - main->y, pz - main->z});
+        }
+        ImGui::TextUnformatted("Rotation:");
+        const double shownDeg = std::fmod(toDegree(main->rotationZ), 360.0);
+        double deg = shownDeg;
+        ImGui::SetNextItemWidth(-1);
+        if (ImGui::InputDouble("##rz", &deg, 0.1, 1.0, "%.1f")) {
+            deg = std::clamp(deg, -360.0, 360.0);
+            if (single) {
+                main->setRotationZ(toRadian(deg));
+            } else {
+                scene_.rotatePropsAround(sel, {main->x, main->y}, toRadian(deg - shownDeg));
+                scene_.changed = true;
+            }
         }
     }
     ImGui::End();

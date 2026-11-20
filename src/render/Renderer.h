@@ -31,6 +31,8 @@ struct RenderOptions {
     bool grid = true;
     bool collisionView = false;
     float clear[4] = {0.f, 0.f, 0.f, 1.f};
+    uint32_t gridColor = 0x909090;   // 0xRRGGBB
+    uint32_t boundColor = 0x0000FF;  // plane bounds
 };
 
 class Renderer {
